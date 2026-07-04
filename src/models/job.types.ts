@@ -11,6 +11,7 @@ export interface Job {
     last_error?: string | null;
     started_at?: Date | null;
     dead_lettered_at?: Date | null;
+    idempotency_key?: string | null;
     created_at: Date;
     updated_at: Date;
 }
@@ -21,4 +22,5 @@ export interface CreateJobInput {
     max_attempts?: number;
     delay_seconds?: number | null;
     run_at?: string | null;
+    idempotency_key?: string | null;
 }

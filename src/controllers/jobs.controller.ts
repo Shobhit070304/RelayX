@@ -6,7 +6,7 @@ const MAX_ATTEMPTS_LIMIT = 25;
 
 export async function createJobHandler(req: Request, res: Response) {
     try {
-        const { type, payload, max_attempts, delay_seconds, run_at } = req.body;
+        const { type, payload, max_attempts, delay_seconds, run_at, idempotency_key } = req.body;
 
         // 1. type must be a non-empty string
         if (!type || typeof type !== 'string') {
@@ -51,7 +51,20 @@ export async function createJobHandler(req: Request, res: Response) {
             return res.status(400).json({ error: payloadError });
         }
 
-        const job = await createJob({ type, payload, max_attempts, delay_seconds, run_at });
+        // 5. idempotency_key — optional, must be a non-empty string if provided
+        if (idempotency_key !== undefined && (typeof idempotency_key !== 'string' || idempotency_key.trim() === '')) {
+            return res.status(400).json({ error: 'idempotency_key must be a non-empty string' });
+        }
+
+        const { job, isDuplicate } = await createJob({ type, payload, max_attempts, delay_seconds, run_at, idempotency_key });
+
+        if (isDuplicate) {
+            // Same key seen before — return the original job, not a new one.
+            // Idempotent-Replay header lets clients detect this programmatically.
+            res.setHeader('Idempotent-Replay', 'true');
+            return res.status(200).json(job);
+        }
+
         return res.status(201).json(job);
     } catch (err) {
         console.error('Error creating job:', err);

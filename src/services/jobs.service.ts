@@ -2,11 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../config/db';
 import { Job, CreateJobInput } from '../models/job.types';
 
-export async function createJob(input: CreateJobInput): Promise<Job> {
+export async function createJob(input: CreateJobInput): Promise<{ job: Job; isDuplicate: boolean }> {
     const id = uuidv4();
-    const { type, payload = {}, max_attempts = 3, delay_seconds, run_at } = input;
+    const { type, payload = {}, max_attempts = 3, delay_seconds, run_at, idempotency_key } = input;
 
-    // If run_at is provided, calculate available_at
+    // Compute available_at from either run_at or delay_seconds
     let availableAt: Date;
     if (run_at) {
         availableAt = new Date(run_at);
@@ -15,12 +15,25 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
         availableAt = new Date(Date.now() + seconds * 1000);
     }
 
-    const result = await pool.query<Job>(
-        `INSERT INTO jobs(id, type, payload, max_attempts, available_at)
-        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [id, type, payload, max_attempts, availableAt]
-    );
-    return result.rows[0];
+    try {
+        const result = await pool.query<Job>(
+            `INSERT INTO jobs(id, type, payload, max_attempts, available_at, idempotency_key)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [id, type, payload, max_attempts, availableAt, idempotency_key ?? null]
+        );
+        return { job: result.rows[0], isDuplicate: false };
+    } catch (err: any) {
+        // PostgreSQL unique constraint violation — idempotency_key already exists.
+        // Return the original job instead of creating a duplicate.
+        if (err.code === '23505' && idempotency_key) {
+            const existing = await pool.query<Job>(
+                `SELECT * FROM jobs WHERE idempotency_key = $1`,
+                [idempotency_key]
+            );
+            return { job: existing.rows[0], isDuplicate: true };
+        }
+        throw err; // any other error — rethrow as-is
+    }
 }
 
 export async function getJobById(id: string): Promise<Job | null> {
