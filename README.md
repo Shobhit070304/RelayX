@@ -66,13 +66,35 @@ cp .env.example .env   # fill in your local Postgres credentials
 psql $DATABASE_URL -f migrations/001_create_jobs_table.sql
 psql $DATABASE_URL -f migrations/002_add_retry_columns.sql
 psql $DATABASE_URL -f migrations/003_add_dead_letter_columns.sql
+```
 
-# Terminal 1: API server
+### Development Mode (with hot reload)
+
+Uses `ts-node-dev` — no manual compile step needed. Changes are reflected immediately.
+
+```bash
+# Terminal 1: API server (hot reload)
 npm run dev
 
-# Terminal 2: Worker
+# Terminal 2: Worker (hot reload)
 npm run worker
 ```
+
+### Production Mode (compiled output)
+
+Compile TypeScript first, then run the compiled JS directly with Node.
+
+```bash
+npm run build          # compiles src/ -> dist/
+
+# Terminal 1: API server
+npm start              # runs: node dist/server.js
+
+# Terminal 2: Worker
+npm run start:worker   # runs: node dist/worker.js
+```
+
+> **Docker vs local:** `docker-compose.yml` uses the production mode — it builds the image (which runs `npm run build`) and then overrides the worker container's command to `["node", "dist/worker.js"]`. The `npm run worker` dev script is only for local development and is not used inside Docker.
 
 ## API Reference
 
