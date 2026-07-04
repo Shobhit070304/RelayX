@@ -15,6 +15,8 @@ Think of it as a lightweight version of BullMQ or AWS SQS — built from scratch
 - **Exponential Backoff Retries** — Failed jobs retry with growing delays + jitter to prevent thundering herd
 - **Delayed / Scheduled Jobs** — Submit jobs with a `delay_seconds` or exact `run_at` timestamp
 - **Dead Letter Queue (DLQ)** — Jobs that exhaust all retries land in a DLQ with a full API for listing, retrying, and discarding
+- **Idempotency Keys** — Optional client-supplied key prevents duplicate jobs on network retries; returns the original job with a `200` and `Idempotent-Replay: true` header
+- **Payload Schema Validation** — Per-handler required-field validation at submission time; rejected before the job enters the queue
 - **Monitoring Dashboard** — Live web UI with real-time job counts, throughput, success rates, and DLQ alerts
 - **Docker Setup** — Full multi-container setup with health checks, restart policies, and pre-packaged DB migrations
 
@@ -66,6 +68,8 @@ cp .env.example .env   # fill in your local Postgres credentials
 psql $DATABASE_URL -f migrations/001_create_jobs_table.sql
 psql $DATABASE_URL -f migrations/002_add_retry_columns.sql
 psql $DATABASE_URL -f migrations/003_add_dead_letter_columns.sql
+psql $DATABASE_URL -f migrations/004_add_started_at.sql
+node migrations/run.js 005_add_idempotency_key.sql
 ```
 
 ### Development Mode (with hot reload)
@@ -113,7 +117,8 @@ npm run start:worker   # runs: node dist/worker.js
   "type": "send_email",
   "payload": { "to": "user@example.com" },
   "max_attempts": 3,
-  "delay_seconds": 30
+  "delay_seconds": 30,
+  "idempotency_key": "your-unique-client-key"
 }
 ```
 
@@ -126,6 +131,22 @@ Or use `run_at` instead of `delay_seconds` for an absolute schedule:
   "run_at": "2026-06-20T09:00:00Z"
 }
 ```
+
+**Fields:**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `type` | string | Yes | Must match a registered handler (`send_email`, `resize_image`, ...) |
+| `payload` | object | No | Defaults to `{}`. Required fields are validated per handler type. |
+| `max_attempts` | integer | No | Min 1, max 25. Defaults to 3. |
+| `delay_seconds` | number | No | Mutually exclusive with `run_at`. |
+| `run_at` | ISO 8601 string | No | Must be a future timestamp. Mutually exclusive with `delay_seconds`. |
+| `idempotency_key` | string | No | If provided, duplicate submissions with the same key return the original job (`200`) instead of creating a new one (`201`). |
+
+**Responses:**
+- `201 Created` — New job created successfully.
+- `200 OK` + header `Idempotent-Replay: true` — Duplicate request; returns the previously created job.
+- `400 Bad Request` — Validation failed (missing type, unregistered handler, invalid max_attempts, missing payload fields, etc.).
 
 ### Dead Letter Queue
 
