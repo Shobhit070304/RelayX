@@ -62,6 +62,9 @@ It demonstrates how PostgreSQL row-level locking (`SELECT FOR UPDATE SKIP LOCKED
 ### 1. Backend Server Setup (`port: 5000`)
 
 ```bash
+# Navigate to server directory
+cd server
+
 # Install backend dependencies
 npm install
 
