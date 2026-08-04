@@ -1,219 +1,158 @@
 # RelayX - Distributed Job Processing Platform
 
-RelayX is a production-style background job processing system built with **Node.js, TypeScript, PostgreSQL, and Redis (Docker)**. 
+RelayX is a production-style backend background job processing engine built with **Node.js, Express, TypeScript, PostgreSQL, and Next.js**. 
 
-Think of it as a lightweight version of BullMQ or AWS SQS — built from scratch to understand the mechanics rather than abstract them away.
+It demonstrates how PostgreSQL row-level locking (`SELECT FOR UPDATE SKIP LOCKED`) can power a durable, ACID-safe distributed job queue with automatic retries, dead-letter queues, and interactive real-time visualization.
 
-## Features
+---
 
-- **Job Queue API** — Submit jobs with type + arbitrary JSON payload
-- **Concurrent Workers** — Multiple stateless worker processes safely claim jobs using `SELECT FOR UPDATE SKIP LOCKED` (zero duplicate processing)
-- **High-Throughput Concurrency** — Run multiple jobs concurrently inside a single worker process up to a configurable limit (`WORKER_CONCURRENCY`)
-- **Recursive Polling Scheduler** — Uses self-pacing recursive timeouts (rather than overlapping intervals) to prevent double-claiming and polling pile-ups
-- **Fast Pickup Optimization** — Instantly schedules subsequent polls (0ms delay) upon slot availability, eliminating idle time
-- **Asynchronous Graceful Drain** — Intercepts termination signals (`SIGTERM`/`SIGINT`), blocks new claims, and drains active jobs before closing connection pools
-- **Exponential Backoff Retries** — Failed jobs retry with growing delays + jitter to prevent thundering herd
-- **Delayed / Scheduled Jobs** — Submit jobs with a `delay_seconds` or exact `run_at` timestamp
-- **Dead Letter Queue (DLQ)** — Jobs that exhaust all retries land in a DLQ with a full API for listing, retrying, and discarding
-- **Idempotency Keys** — Optional client-supplied key prevents duplicate jobs on network retries; returns the original job with a `200` and `Idempotent-Replay: true` header
-- **Payload Schema Validation** — Per-handler required-field validation at submission time; rejected before the job enters the queue
-- **Monitoring Dashboard** — Live web UI with real-time job counts, throughput, success rates, and DLQ alerts
-- **Docker Setup** — Full multi-container setup with health checks, restart policies, and pre-packaged DB migrations
+## 🚀 Key Features
 
-## Architecture
+- **PostgreSQL Queue Engine** — Submit jobs with type, arbitrary JSON payload, delay seconds, or timestamp execution (`available_at`).
+- **Atomic Row Lock Claiming** — Concurrent workers safely claim pending jobs using `SELECT FOR UPDATE SKIP LOCKED` (zero lock contention or duplicate execution).
+- **High-Throughput Concurrency** — Configurable parallel worker processing limit (`WORKER_CONCURRENCY`).
+- **Exponential Backoff & Retries** — Failed jobs retry automatically with growing delays + randomized jitter to prevent thundering herd problems.
+- **Dead Letter Queue (DLQ)** — Poison-pill jobs exhausting max retries transition to DLQ with full stack trace preservation and 1-click retry API.
+- **Strict Idempotency** — Unique `idempotency_key` constraints prevent duplicate job creation upon network retries.
+- **Interactive Next.js Dashboard** — Modern real-time UI featuring a live job queue inspector, interactive API playground, telemetry metrics, and DLQ controls.
+- **Graceful SIGINT Draining** — Workers intercept shutdown signals, block new row claims, and drain active in-flight jobs before terminating.
+
+---
+
+## 🏗️ Architecture Overview
 
 ```
-                    ┌─────────────────────────────────┐
-  POST /api/jobs    │          Express API              │    GET /api/stats
-  ─────────────────▶│  (Job Producer + REST Interface)  │◀───────────────────
-                    └──────────────────┬───────────────┘
-                                       │ INSERT
-                                       ▼
-                              ┌─────────────────┐
-                              │   PostgreSQL      │
-                              │   jobs table      │
-                              │  ┌─────────────┐ │
-                              │  │   pending   │ │
-                              │  │ processing  │ │
-                              │  │  completed  │ │
-                              │  │ dead_letter │ │
-                              │  └─────────────┘ │
-                              └────────┬─────────┘
-                                       │ SELECT FOR UPDATE SKIP LOCKED
-                          ┌────────────┼────────────┐
-                          ▼            ▼            ▼
-                      Worker 1    Worker 2    Worker N
-                    (stateless — scale horizontally by running more)
+                      ┌─────────────────────────────────────────┐
+    POST /api/jobs    │             Express API                 │    GET /api/stats
+   ──────────────────▶│          (Backend Port: 5000)         │◀──────────────────
+                      └────────────────────┬────────────────────┘
+                                           │ INSERT
+                                           ▼
+                                  ┌─────────────────┐
+                                  │   PostgreSQL    │
+                                  │   jobs table    │
+                                  │  ┌───────────┐  │
+                                  │  │  pending  │  │
+                                  │  │ processing│  │
+                                  │  │ completed │  │
+                                  │  │dead_letter│  │
+                                  │  └───────────┘  │
+                                  └────────┬────────┘
+                                           │ SELECT FOR UPDATE SKIP LOCKED
+                              ┌────────────┼────────────┐
+                              ▼            ▼            ▼
+                          Worker 1     Worker 2     Worker N
+                        (stateless worker nodes polling PostgreSQL)
 ```
 
-## Quick Start
+---
+
+## ⚙️ Port Configuration
+
+| Service | Host URL | Description |
+|---|---|---|
+| **Backend Express API** | `http://localhost:5000` | REST API Server (`PORT=5000`) |
+| **Frontend Dashboard** | `http://localhost:3000` | Next.js Interactive Dashboard |
+| **PostgreSQL Database** | `localhost:5432` | Storage Engine |
+
+---
+
+## 🛠️ Quick Start (Local Development)
+
+### 1. Backend Server Setup (`port: 5000`)
 
 ```bash
-git clone <your-repo-url>
-cd job-platform
-docker-compose up --build
-```
-
-That's it. Visit `http://localhost:3000/dashboard.html` for the monitoring dashboard.
-
-> **Note:** On first run, Postgres auto-applies all migrations from `migrations/` via `docker-entrypoint-initdb.d`.
-
-## Running Locally (without Docker)
-
-```bash
+# Install backend dependencies
 npm install
-cp .env.example .env   # fill in your local Postgres credentials
 
-# Run migrations
-psql $DATABASE_URL -f migrations/001_create_jobs_table.sql
-psql $DATABASE_URL -f migrations/002_add_retry_columns.sql
-psql $DATABASE_URL -f migrations/003_add_dead_letter_columns.sql
-psql $DATABASE_URL -f migrations/004_add_started_at.sql
-node migrations/run.js 005_add_idempotency_key.sql
-```
+# Copy environment variables template
+cp .env.example .env
 
-### Development Mode (with hot reload)
+# Start Postgres database (or use local PostgreSQL)
+docker-compose up postgres -d
 
-Uses `ts-node-dev` — no manual compile step needed. Changes are reflected immediately.
+# Run database migrations
+npm run migrate
 
-```bash
-# Terminal 1: API server (hot reload)
+# Start Express API Server (Terminal 1)
 npm run dev
 
-# Terminal 2: Worker (hot reload)
+# Start Background Worker Process (Terminal 2)
 npm run worker
 ```
 
-### Production Mode (compiled output)
-
-Compile TypeScript first, then run the compiled JS directly with Node.
+### 2. Frontend Client Setup (`port: 3000`)
 
 ```bash
-npm run build          # compiles src/ -> dist/
+# Navigate to client directory
+cd client
 
-# Terminal 1: API server
-npm start              # runs: node dist/server.js
+# Install client dependencies
+npm install
 
-# Terminal 2: Worker
-npm run start:worker   # runs: node dist/worker.js
+# Copy environment setup
+cp .env.example .env.local
+
+# Start Next.js Development Server (Terminal 3)
+npm run dev
 ```
 
-> **Docker vs local:** `docker-compose.yml` uses the production mode — it builds the image (which runs `npm run build`) and then overrides the worker container's command to `["node", "dist/worker.js"]`. The `npm run worker` dev script is only for local development and is not used inside Docker.
+Open `http://localhost:3000` in your browser to view the interactive RelayX console and live queue state.
 
-## API Reference
+---
 
-### Jobs
+## 🐳 Docker Deployment
+
+To spin up the entire infrastructure via Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+---
+
+## 📜 REST API Reference
+
+### Jobs API (`http://localhost:5000/api/jobs`)
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/jobs` | Create a new job |
-| `GET` | `/api/jobs` | List jobs (filterable by status, paginated) |
-| `GET` | `/api/jobs/:id` | Get a single job by ID |
+|---|---|---|
+| `POST` | `/api/jobs` | Enqueue a new background job |
+| `GET` | `/api/jobs` | List queue jobs (filterable by status, paginated) |
+| `GET` | `/api/jobs/:id` | Fetch single job metadata by ID |
 
-**Create job — request body:**
+#### Dispatch Job Example:
 
-```json
+```http
+POST /api/jobs
+Content-Type: application/json
+
 {
   "type": "send_email",
   "payload": { "to": "user@example.com" },
   "max_attempts": 3,
-  "delay_seconds": 30,
-  "idempotency_key": "your-unique-client-key"
+  "delay_seconds": 10,
+  "idempotency_key": "unique_tx_109283"
 }
 ```
 
-Or use `run_at` instead of `delay_seconds` for an absolute schedule:
-
-```json
-{
-  "type": "send_email",
-  "payload": { "to": "user@example.com" },
-  "run_at": "2026-06-20T09:00:00Z"
-}
-```
-
-**Fields:**
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `type` | string | Yes | Must match a registered handler (`send_email`, `resize_image`, ...) |
-| `payload` | object | No | Defaults to `{}`. Required fields are validated per handler type. |
-| `max_attempts` | integer | No | Min 1, max 25. Defaults to 3. |
-| `delay_seconds` | number | No | Mutually exclusive with `run_at`. |
-| `run_at` | ISO 8601 string | No | Must be a future timestamp. Mutually exclusive with `delay_seconds`. |
-| `idempotency_key` | string | No | If provided, duplicate submissions with the same key return the original job (`200`) instead of creating a new one (`201`). |
-
-**Responses:**
-- `201 Created` — New job created successfully.
-- `200 OK` + header `Idempotent-Replay: true` — Duplicate request; returns the previously created job.
-- `400 Bad Request` — Validation failed (missing type, unregistered handler, invalid max_attempts, missing payload fields, etc.).
-
-### Dead Letter Queue
+### Dead Letter Queue (DLQ) API
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/dead-letter` | List all DLQ jobs (paginated) |
-| `POST` | `/api/dead-letter/:id/retry` | Reset job to pending (full retry reset) |
-| `DELETE` | `/api/dead-letter/:id` | Permanently discard a job |
+|---|---|---|
+| `GET` | `/api/dead-letter` | List all dead-lettered jobs |
+| `POST` | `/api/dead-letter/:id/retry` | Re-queue a DLQ job (resets attempts to 0) |
+| `DELETE` | `/api/dead-letter/:id` | Permanently discard a DLQ job |
 
-### Stats & Monitoring
+### Telemetry & Stats
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/stats` | Aggregate metrics (counts, throughput, success rate, DLQ health) |
-| `GET` | `/health` | Health check |
+|---|---|---|
+| `GET` | `/api/stats` | Queue metrics, active counts, and throughput |
+| `GET` | `/health` | Server health check |
 
-## Job Lifecycle
+---
 
-```
-pending ──► processing ──► completed
-                │
-                ├── attempts < max_attempts ──► pending (after backoff delay)
-                │
-                └── attempts >= max_attempts ──► dead_letter
-```
+## 📄 License & Author
 
-## Key Design Decisions
-
-**Why PostgreSQL as a queue (instead of Redis/BullMQ)?**  
-At moderate scale, Postgres `SELECT FOR UPDATE SKIP LOCKED` provides durable, ACID-safe job claiming without additional infrastructure. The tradeoff vs. Redis-based queues is latency (polling interval vs. push-based wakeup) — a conscious choice here given the simpler ops footprint. Redis is included in the stack for future use (stats caching, pub/sub notifications).
-
-**Why polling instead of `LISTEN/NOTIFY`?**  
-Polling is simpler to reason about, debug, and operate. `LISTEN/NOTIFY` would reduce latency (~0ms vs. up to poll interval) but adds connection-management complexity. For most job workloads where seconds of latency are acceptable, polling is the right default.
-
-**Why `available_at` instead of a separate `scheduled_at` column?**  
-Both retries (exponential backoff) and delayed jobs need the same primitive: "don't make this job visible until time X." One column serves both use cases — fewer columns, same guarantee.
-
-**Why `dead_letter` as a separate status instead of `failed`?**  
-`failed` is transient (job is mid-retry-cycle). `dead_letter` is terminal (all retries exhausted, human action required). Using the same status for both makes them indistinguishable — bad observability. Two distinct statuses enable targeted querying, alerting, and admin tooling.
-
-**Why partial index on `dead_letter`?**  
-`CREATE INDEX ... WHERE status = 'dead_letter'` only indexes the small subset of rows that are actually in the DLQ. On a table with millions of `completed` jobs, a full-table status index would be unnecessarily large. The partial index stays small and fast regardless of table growth.
-
-## Scaling
-
-- **Horizontal worker scaling:** Workers are stateless — run `N` instances with the same `DATABASE_URL`. Postgres row-level locking handles coordination automatically.
-- **Throughput bottleneck:** At high load, the poll interval becomes the primary latency driver. Reduce `POLL_INTERVAL_MS` or switch to Postgres `LISTEN/NOTIFY` for sub-second latency.
-- **Database bottleneck:** The `idx_jobs_status_available_at` compound index keeps claim queries fast. For very high volume (millions of jobs/day), consider partitioning the table by status or archiving completed jobs.
-
-## Project Structure
-
-```
-src/
-├── config/         # DB pool, env validation
-├── models/         # TypeScript interfaces
-├── services/       # Business logic (jobs, stats)
-├── controllers/    # Request handlers
-├── routes/         # Express routers
-└── workers/        # Worker process + job handlers
-migrations/         # SQL migration files (auto-applied by Docker)
-public/             # dashboard.html (served by Express)
-```
-
-## Tech Stack
-
-- **Runtime:** Node.js 20, TypeScript
-- **Framework:** Express.js
-- **Database:** PostgreSQL 16
-- **Cache / Messaging:** Redis 7 (infrastructure ready)
-- **Containerization:** Docker + Docker Compose
+Created by [Shobhit070304](https.github.com/Shobhit070304). Open-source under the MIT License.
