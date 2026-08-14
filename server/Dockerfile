@@ -25,4 +25,4 @@ COPY migrations ./migrations
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "node dist/worker.js & node dist/server.js"]
+CMD ["sh", "-c", "node migrations/run.js && node dist/worker.js & node dist/server.js"]

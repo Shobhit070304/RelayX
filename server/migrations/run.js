@@ -13,7 +13,7 @@ async function runMigration() {
         console.error('❌ Error: No migration file specified.');
         console.log('\nUsage:');
         console.log('  node migrations/run.js <migration_file_name>');
-        
+
         // List files in migrations folder for utility
         try {
             const files = fs.readdirSync(__dirname)
@@ -48,16 +48,16 @@ async function runMigration() {
     try {
         await client.connect();
         console.log('🔌 Connected to the database. Starting migration transaction...');
-        
+
         // Begin transaction
         await client.query('BEGIN');
-        
+
         // Run SQL script
         await client.query(sql);
-        
+
         // Commit transaction
         await client.query('COMMIT');
-        
+
         console.log('✅ Migration completed successfully and transaction committed!');
     } catch (err) {
         try {
