@@ -9,32 +9,16 @@ async function runMigration() {
     const args = process.argv.slice(2);
     const targetFile = args[0];
 
-    if (!targetFile) {
-        console.error('❌ Error: No migration file specified.');
-        console.log('\nUsage:');
-        console.log('  node migrations/run.js <migration_file_name>');
+    const allFiles = fs.readdirSync(__dirname)
+        .filter(file => file.endsWith('.sql'))
+        .sort();
 
-        // List files in migrations folder for utility
-        try {
-            const files = fs.readdirSync(__dirname)
-                .filter(file => file.endsWith('.sql'));
-            console.log('\nAvailable migrations:');
-            files.forEach(f => console.log(`  - ${f}`));
-        } catch (e) {
-            // Ignore readdir error
-        }
-        process.exit(1);
+    const filesToRun = targetFile ? [targetFile] : allFiles;
+
+    if (filesToRun.length === 0) {
+        console.log('ℹ️ No migration files found.');
+        return;
     }
-
-    const filePath = path.join(__dirname, targetFile);
-
-    if (!fs.existsSync(filePath)) {
-        console.error(`❌ Error: Migration file not found at: ${filePath}`);
-        process.exit(1);
-    }
-
-    console.log(`📖 Reading migration file: ${targetFile}...`);
-    const sql = fs.readFileSync(filePath, 'utf8');
 
     if (!process.env.DATABASE_URL) {
         console.error('❌ Error: DATABASE_URL is not defined in the environment variables.');
@@ -43,22 +27,30 @@ async function runMigration() {
 
     const client = new Client({
         connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     });
 
     try {
         await client.connect();
-        console.log('🔌 Connected to the database. Starting migration transaction...');
+        console.log('🔌 Connected to the database.');
 
-        // Begin transaction
-        await client.query('BEGIN');
+        for (const file of filesToRun) {
+            const filePath = path.join(__dirname, file);
+            if (!fs.existsSync(filePath)) {
+                console.error(`❌ Error: Migration file not found at: ${filePath}`);
+                process.exit(1);
+            }
 
-        // Run SQL script
-        await client.query(sql);
+            console.log(`📖 Running migration: ${file}...`);
+            const sql = fs.readFileSync(filePath, 'utf8');
 
-        // Commit transaction
-        await client.query('COMMIT');
+            await client.query('BEGIN');
+            await client.query(sql);
+            await client.query('COMMIT');
+            console.log(`✅ [${file}] applied successfully.`);
+        }
 
-        console.log('✅ Migration completed successfully and transaction committed!');
+        console.log('🎉 All migrations applied!');
     } catch (err) {
         try {
             console.log('🔄 Error encountered. Rolling back transaction...');
