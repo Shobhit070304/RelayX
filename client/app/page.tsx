@@ -457,6 +457,17 @@ export default function LandingPage() {
               </p>
             </div>
 
+            {/* Feature 7 */}
+            <div className="p-6 rounded-xl border border-neutral-800 bg-neutral-900/40 hover:border-indigo-500/50 hover:bg-neutral-900/60 transition duration-200 flex flex-col justify-between h-full space-y-3 group shadow-xl">
+              <div className="flex items-center justify-between text-xs font-mono text-neutral-400">
+                <span className="font-tnr text-lg text-white font-bold group-hover:text-indigo-300 transition">07. Priority Queuing</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 uppercase font-mono">New</span>
+              </div>
+              <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed font-sans font-light">
+                Assign a <code className="font-mono text-xs text-neutral-300 bg-neutral-950 px-1.5 py-0.5 rounded">priority</code> integer to any job. Workers always claim higher-priority jobs first via <code className="font-mono text-xs text-neutral-300 bg-neutral-950 px-1.5 py-0.5 rounded">ORDER BY priority DESC</code>, ensuring urgent tasks skip the queue.
+              </p>
+            </div>
+
           </div>
 
         </div>
@@ -607,6 +618,16 @@ export default function LandingPage() {
                     <span className="text-white font-bold text-sm">attempts / max_attempts</span>
                     <span className="text-neutral-400 block text-xs font-sans mt-1">
                       Tracks execution count & DLQ escalation threshold.
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-neutral-950 border border-indigo-900/60 col-span-full">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold text-sm">priority</span>
+                      <span className="px-1.5 py-0.5 text-[9px] bg-indigo-950/60 border border-indigo-800 text-indigo-400 rounded font-mono">NEW</span>
+                    </div>
+                    <span className="text-neutral-400 block text-xs font-sans mt-1">
+                      Integer (default 0). Higher value = claimed first via <code className="text-neutral-200 font-mono bg-neutral-900 px-1 py-0.5 rounded">ORDER BY priority DESC</code>. Enables urgent job fast-tracking.
                     </span>
                   </div>
                 </div>

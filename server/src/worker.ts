@@ -58,6 +58,14 @@ async function processJob(): Promise<void> {
     // This is what enables concurrency: we return immediately so the poll
     // loop can claim more jobs while this one is still running.
     (async () => {
+        const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+        const heartbeatTimer = setInterval(async () => {
+            try {
+                await pool.query(`UPDATE jobs SET updated_at = now() WHERE id = $1 AND status = 'processing'`, [job.id]);
+            } catch (error) {
+                console.error(`[worker] Heartbeat failed for job ${job.id}:`, error);
+            }
+        }, HEARTBEAT_INTERVAL_MS);
         try {
             if (!handler) {
                 console.error(`[worker] No handler for type "${job.type}"`);
@@ -67,7 +75,7 @@ async function processJob(): Promise<void> {
 
             await handler(job);
             await markJobCompleted(job.id);
-            console.log(`[worker] Job ${job.id} completed | active: ${activeJobs.size - 1}/${CONCURRENCY_LIMIT}`);
+            console.log(`[worker] Job ${job.id} completed priority: ${job.priority} | active: ${activeJobs.size - 1}/${CONCURRENCY_LIMIT}`);
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
             console.error(`[worker] Job ${job.id} failed: ${error.message}`);
@@ -75,7 +83,7 @@ async function processJob(): Promise<void> {
         } finally {
             // De-register the job from the active set.
             activeJobs.delete(job.id);
-
+            clearInterval(heartbeatTimer);
             // ── Fast Pickup ─────────────────────────────────────────────────
             // A slot just freed up. Instead of waiting for the next poll
             // interval tick (up to 2s), immediately try to grab another job.

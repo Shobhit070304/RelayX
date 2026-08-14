@@ -6,7 +6,7 @@ const MAX_ATTEMPTS_LIMIT = 25;
 
 export async function createJobHandler(req: Request, res: Response) {
     try {
-        const { type, payload, max_attempts, delay_seconds, run_at, idempotency_key } = req.body;
+        const { type, payload, max_attempts, delay_seconds, run_at, idempotency_key, priority } = req.body;
 
         // 1. type must be a non-empty string
         if (!type || typeof type !== 'string') {
@@ -44,6 +44,13 @@ export async function createJobHandler(req: Request, res: Response) {
             }
         }
 
+        // 4. priority must be an integer
+        if (priority !== undefined) {
+            if (typeof priority !== 'number' || !Number.isInteger(priority)) {
+                return res.status(400).json({ error: 'priority must be an integer' });
+            }
+        }
+
         // 4. Per-handler payload schema validation — catches missing required fields early
         const normalizedPayload: Record<string, unknown> = (payload && typeof payload === 'object') ? payload : {};
         const payloadError = validatePayload(type, normalizedPayload);
@@ -56,7 +63,7 @@ export async function createJobHandler(req: Request, res: Response) {
             return res.status(400).json({ error: 'idempotency_key must be a non-empty string' });
         }
 
-        const { job, isDuplicate } = await createJob({ type, payload, max_attempts, delay_seconds, run_at, idempotency_key });
+        const { job, isDuplicate } = await createJob({ type, payload, max_attempts, delay_seconds, run_at, idempotency_key, priority });
 
         if (isDuplicate) {
             // Same key seen before — return the original job, not a new one.

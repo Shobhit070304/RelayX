@@ -43,6 +43,7 @@ export default function DashboardPage() {
   const [payloadJson, setPayloadJson] = useState<string>(DEFAULT_PAYLOADS["send_email"]);
   const [simulateFailure, setSimulateFailure] = useState<boolean>(false);
   const [maxAttempts, setMaxAttempts] = useState<number>(3);
+  const [priority, setPriority] = useState<number>(0);
   const [delaySeconds, setDelaySeconds] = useState<string>("");
   const [runAt, setRunAt] = useState<string>("");
   const [idempotencyKey, setIdempotencyKey] = useState<string>("");
@@ -170,6 +171,7 @@ export default function DashboardPage() {
         type: finalType,
         payload: parsedPayload,
         max_attempts: Number(maxAttempts),
+        priority: priority,
         delay_seconds: delayNum,
         run_at: runAtStr,
         idempotency_key: idempotencyKey.trim() || undefined,
@@ -508,6 +510,7 @@ export default function DashboardPage() {
                   <th className="p-3">Job ID</th>
                   <th className="p-3">Type</th>
                   <th className="p-3">Status</th>
+                  <th className="p-3">Priority</th>
                   <th className="p-3">Attempts</th>
                   <th className="p-3">Last Error</th>
                   <th className="p-3">Created At</th>
@@ -515,19 +518,19 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-800/60">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="p-6 text-center text-neutral-500">
-                      Loading queue data via Axios...
-                    </td>
-                  </tr>
-                ) : jobs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-6 text-center text-neutral-500">
-                      No jobs match current status filter.
-                    </td>
-                  </tr>
-                ) : (
+                  {loading ? (
+                   <tr>
+                     <td colSpan={8} className="p-6 text-center text-neutral-500">
+                       Loading queue data via Axios...
+                     </td>
+                   </tr>
+                 ) : jobs.length === 0 ? (
+                   <tr>
+                     <td colSpan={8} className="p-6 text-center text-neutral-500">
+                       No jobs match current status filter.
+                     </td>
+                   </tr>
+                 ) : (
                   jobs.map((j) => {
                     const statusColor =
                       j.status === "completed"
@@ -556,6 +559,17 @@ export default function DashboardPage() {
                         <td className="p-3">
                           <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] border uppercase ${statusColor}`}>
                             {j.status.replace("_", " ")}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${
+                            j.priority > 50
+                              ? "bg-rose-950 text-rose-300 border-rose-800"
+                              : j.priority > 0
+                              ? "bg-amber-950 text-amber-300 border-amber-800"
+                              : "bg-neutral-900 text-neutral-500 border-neutral-800"
+                          }`}>
+                            {j.priority ?? 0}
                           </span>
                         </td>
                         <td className="p-3 text-neutral-400">
@@ -670,7 +684,7 @@ export default function DashboardPage() {
               </label>
             </div>
 
-            {/* Max Attempts (Optional) */}
+            {/* Max Attempts + Priority Row */}
             <div className="md:col-span-4 space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] text-neutral-300 block font-bold">Max Attempts</label>
@@ -684,6 +698,26 @@ export default function DashboardPage() {
                 onChange={(e) => setMaxAttempts(Number(e.target.value))}
                 className="w-full px-3 py-1.5 rounded bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500"
               />
+            </div>
+
+            {/* Priority (New Feature) */}
+            <div className="md:col-span-4 space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-neutral-300 block font-bold">
+                  Priority
+                  <span className="ml-1.5 px-1.5 py-0.5 text-[9px] bg-indigo-950/60 border border-indigo-800 text-indigo-400 rounded font-mono">NEW</span>
+                </label>
+                <span className="text-[9px] text-neutral-500 uppercase font-mono">(Optional)</span>
+              </div>
+              <input
+                type="number"
+                min="0"
+                value={priority}
+                onChange={(e) => setPriority(Number(e.target.value))}
+                placeholder="0 = normal, 100 = urgent"
+                className="w-full px-3 py-1.5 rounded bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500"
+              />
+              <p className="text-[9px] text-neutral-500 font-sans">Higher value = processed first. Default: 0</p>
             </div>
 
             {/* Idempotency Key (Optional) */}

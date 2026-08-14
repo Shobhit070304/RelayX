@@ -10,6 +10,7 @@ export interface Job {
   status: JobStatus;
   attempts: number;
   max_attempts: number;
+  priority: number;
   available_at: string;
   last_error?: string | null;
   started_at?: string | null;
@@ -23,6 +24,7 @@ export interface CreateJobInput {
   type: string;
   payload?: Record<string, unknown>;
   max_attempts?: number;
+  priority?: number;
   delay_seconds?: number | null;
   run_at?: string | null;
   idempotency_key?: string | null;

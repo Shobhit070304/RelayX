@@ -4,7 +4,7 @@ import { Job, CreateJobInput } from '../models/job.types';
 
 export async function createJob(input: CreateJobInput): Promise<{ job: Job; isDuplicate: boolean }> {
     const id = uuidv4();
-    const { type, payload = {}, max_attempts = 3, delay_seconds, run_at, idempotency_key } = input;
+    const { type, payload = {}, max_attempts = 3, delay_seconds, run_at, idempotency_key, priority = 0 } = input;
 
     // Compute available_at from either run_at or delay_seconds
     let availableAt: Date;
@@ -17,9 +17,9 @@ export async function createJob(input: CreateJobInput): Promise<{ job: Job; isDu
 
     try {
         const result = await pool.query<Job>(
-            `INSERT INTO jobs(id, type, payload, max_attempts, available_at, idempotency_key)
-            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [id, type, payload, max_attempts, availableAt, idempotency_key ?? null]
+            `INSERT INTO jobs(id, type, payload, max_attempts, available_at, idempotency_key, priority)
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [id, type, payload, max_attempts, availableAt, idempotency_key ?? null, priority]
         );
         return { job: result.rows[0], isDuplicate: false };
     } catch (err: any) {
@@ -51,7 +51,7 @@ export async function claimNextPendingJob(): Promise<Job | null> {
      WHERE id = (
        SELECT id FROM jobs
        WHERE status = 'pending' AND available_at <= now()
-       ORDER BY available_at ASC, created_at ASC
+       ORDER BY priority DESC, available_at ASC, created_at ASC
        FOR UPDATE SKIP LOCKED
        LIMIT 1
      )

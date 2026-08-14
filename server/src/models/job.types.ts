@@ -12,6 +12,7 @@ export interface Job {
     started_at?: Date | null;
     dead_lettered_at?: Date | null;
     idempotency_key?: string | null;
+    priority?: number;
     created_at: Date;
     updated_at: Date;
 }
@@ -23,4 +24,5 @@ export interface CreateJobInput {
     delay_seconds?: number | null;
     run_at?: string | null;
     idempotency_key?: string | null;
+    priority?: number;
 }
