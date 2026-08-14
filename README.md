@@ -9,6 +9,7 @@ It demonstrates how PostgreSQL row-level locking (`SELECT FOR UPDATE SKIP LOCKED
 ## 🚀 Key Features
 
 - **PostgreSQL Queue Engine** — Submit jobs with type, arbitrary JSON payload, delay seconds, or timestamp execution (`available_at`).
+- **Priority-Based Scheduling** — High-priority jobs (`priority: 0-10`) are claimed first ahead of regular workloads.
 - **Atomic Row Lock Claiming** — Concurrent workers safely claim pending jobs using `SELECT FOR UPDATE SKIP LOCKED` (zero lock contention or duplicate execution).
 - **High-Throughput Concurrency** — Configurable parallel worker processing limit (`WORKER_CONCURRENCY`).
 - **Exponential Backoff & Retries** — Failed jobs retry automatically with growing delays + randomized jitter to prevent thundering herd problems.
@@ -133,6 +134,7 @@ Content-Type: application/json
 {
   "type": "send_email",
   "payload": { "to": "user@example.com" },
+  "priority": 10,
   "max_attempts": 3,
   "delay_seconds": 10,
   "idempotency_key": "unique_tx_109283"
