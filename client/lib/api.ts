@@ -55,18 +55,16 @@ export interface StatsData {
   };
 }
 
-export interface PaginatedResponse<T> {
-  data?: T[];
-  jobs?: T[];
+export interface PaginationMetadata {
   total: number;
-  limit?: number;
-  offset?: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
 }
 
-export interface CreateJobResponse {
-  data?: Job;
-  job?: Job;
-  isDuplicate?: boolean;
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: PaginationMetadata;
 }
 
 // Determine default API Base URL dynamically
@@ -118,12 +116,15 @@ export const relayApi = {
   /**
    * Fetch list of jobs with optional status filter & pagination
    */
-  async getJobs(params?: { status?: string; limit?: number; offset?: number }): Promise<{ jobs: Job[]; total: number }> {
+  async getJobs(params?: { status?: string; limit?: number; offset?: number }): Promise<{ jobs: Job[]; total: number; has_more: boolean; limit: number; offset: number }> {
     const response = await apiClient.get<PaginatedResponse<Job>>("/api/jobs", { params });
-    const jobsList = response.data.data || response.data.jobs || [];
+    const { data, pagination } = response.data;
     return {
-      jobs: jobsList,
-      total: response.data.total ?? jobsList.length,
+      jobs: data,
+      total: pagination.total,
+      has_more: pagination.has_more,
+      limit: pagination.limit,
+      offset: pagination.offset,
     };
   },
 
@@ -131,34 +132,33 @@ export const relayApi = {
    * Fetch a single job by UUID
    */
   async getJobById(id: string): Promise<Job> {
-    const response = await apiClient.get<{ data?: Job; job?: Job }>(`/api/jobs/${id}`);
-    const jobObj = response.data.data || response.data.job;
-    if (!jobObj) throw new Error(`Job ${id} not found.`);
-    return jobObj;
+    const response = await apiClient.get<Job>(`/api/jobs/${id}`);
+    return response.data;
   },
 
   /**
    * Enqueue a new background job via POST /api/jobs
    */
   async createJob(input: CreateJobInput): Promise<{ job: Job; isDuplicate: boolean }> {
-    const response = await apiClient.post<CreateJobResponse>("/api/jobs", input);
-    const createdJob = response.data.data || response.data.job;
-    if (!createdJob) throw new Error("Failed to parse returned job response.");
+    const response = await apiClient.post<Job>("/api/jobs", input);
     return {
-      job: createdJob,
-      isDuplicate: !!response.data.isDuplicate,
+      job: response.data,
+      isDuplicate: response.headers["idempotent-replay"] === "true" || response.status === 200,
     };
   },
 
   /**
    * Fetch dead letter queue jobs
    */
-  async getDeadLetterJobs(params?: { limit?: number; offset?: number }): Promise<{ jobs: Job[]; total: number }> {
+  async getDeadLetterJobs(params?: { limit?: number; offset?: number }): Promise<{ jobs: Job[]; total: number; has_more: boolean; limit: number; offset: number }> {
     const response = await apiClient.get<PaginatedResponse<Job>>("/api/dead-letter", { params });
-    const jobsList = response.data.data || response.data.jobs || [];
+    const { data, pagination } = response.data;
     return {
-      jobs: jobsList,
-      total: response.data.total ?? jobsList.length,
+      jobs: data,
+      total: pagination.total,
+      has_more: pagination.has_more,
+      limit: pagination.limit,
+      offset: pagination.offset,
     };
   },
 
@@ -166,10 +166,8 @@ export const relayApi = {
    * Retry a dead-lettered job (resets attempts to 0 & status to pending)
    */
   async retryDeadLetterJob(id: string): Promise<Job> {
-    const response = await apiClient.post<{ data?: Job; job?: Job }>(`/api/dead-letter/${id}/retry`);
-    const retriedJob = response.data.data || response.data.job;
-    if (!retriedJob) throw new Error("Failed to parse retried job response.");
-    return retriedJob;
+    const response = await apiClient.post<Job>(`/api/dead-letter/${id}/retry`);
+    return response.data;
   },
 
   /**

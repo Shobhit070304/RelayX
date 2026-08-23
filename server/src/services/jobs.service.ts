@@ -171,7 +171,7 @@ export interface ListJobsOptions {
 }
 
 export async function listJobs(options: ListJobsOptions = {}): Promise<{ jobs: Job[]; total: number }> {
-    const limit = Math.min(options.limit ?? 20, 100);
+    const limit = Math.min(options.limit ?? 10, 100);
     const offset = options.offset ?? 0;
 
     // Build dynamic WHERE clause safely

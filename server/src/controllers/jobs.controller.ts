@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
-import { createJob, getJobById } from '../services/jobs.service';
+import { createJob, getJobById, listJobs } from '../services/jobs.service';
 import { getHandler, validatePayload } from '../workers/handlers/index';
 
 const MAX_ATTEMPTS_LIMIT = 25;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function createJobHandler(req: Request, res: Response) {
     try {
@@ -79,12 +80,42 @@ export async function createJobHandler(req: Request, res: Response) {
     }
 }
 
+export async function listJobsHandler(req: Request, res: Response) {
+    try {
+        const limit = parseInt(req.query.limit as string, 10) || 10;
+        const offset = parseInt(req.query.offset as string, 10) || 0;
+        const status = typeof req.query.status === 'string' && req.query.status.trim() !== '' ? req.query.status.trim() : undefined;
+
+        if (limit < 1 || limit > 100) {
+            return res.status(400).json({ error: '"limit" must be between 1 and 100' });
+        }
+
+        if (offset < 0 || isNaN(offset)) {
+            return res.status(400).json({ error: '"offset" must be a non-negative integer' });
+        }
+
+        const { jobs, total } = await listJobs({ status, limit, offset });
+
+        return res.status(200).json({
+            data: jobs,
+            pagination: {
+                total,
+                limit,
+                offset,
+                has_more: offset + jobs.length < total,
+            },
+        });
+    } catch (err) {
+        console.error('Error listing jobs:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+}
 
 export async function getJobHandler(req: Request, res: Response) {
     try {
         const { id } = req.params;
-        if (typeof id !== 'string') {
-            return res.status(400).json({ error: 'Invalid or missing job ID' });
+        if (!id || typeof id !== 'string' || !UUID_REGEX.test(id)) {
+            return res.status(400).json({ error: 'Invalid or missing job ID format. Expected a valid UUID.' });
         }
         const job = await getJobById(id);
         if (!job) {

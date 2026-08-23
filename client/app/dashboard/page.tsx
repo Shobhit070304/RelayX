@@ -31,6 +31,9 @@ export default function DashboardPage() {
   const [activeStatus, setActiveStatus] = useState<string>("");
   const [stats, setStats] = useState<StatsData | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [totalJobs, setTotalJobs] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [metaText, setMetaText] = useState<string>("Connecting via Axios...");
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -72,11 +75,16 @@ export default function DashboardPage() {
     try {
       const [statsData, jobsData] = await Promise.all([
         relayApi.getStats(),
-        relayApi.getJobs({ status: activeStatus || undefined, limit: 20 }),
+        relayApi.getJobs({
+          status: activeStatus || undefined,
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+        }),
       ]);
 
       setStats(statsData);
       setJobs(jobsData.jobs);
+      setTotalJobs(jobsData.total);
       setMetaText(`Last updated: ${new Date().toLocaleTimeString()} · Auto-refreshes every 5s`);
       setLoading(false);
     } catch (err: any) {
@@ -89,7 +97,7 @@ export default function DashboardPage() {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 5000);
     return () => clearInterval(interval);
-  }, [activeStatus]);
+  }, [activeStatus, currentPage, pageSize]);
 
   // Handle Job Type change
   const handleJobTypeChange = (type: string) => {
@@ -381,7 +389,10 @@ export default function DashboardPage() {
               </span>
             </div>
             <button
-              onClick={() => setActiveStatus("dead_letter")}
+              onClick={() => {
+                setActiveStatus("dead_letter");
+                setCurrentPage(1);
+              }}
               className="px-2 py-0.5 text-[10px] rounded bg-rose-900 text-rose-100 hover:bg-rose-800 transition uppercase"
             >
               Filter DLQ Jobs ↓
@@ -489,7 +500,10 @@ export default function DashboardPage() {
               ].map((tab) => (
                 <button
                   key={tab.value}
-                  onClick={() => setActiveStatus(tab.value)}
+                  onClick={() => {
+                    setActiveStatus(tab.value);
+                    setCurrentPage(1);
+                  }}
                   className={`px-2.5 py-1 rounded transition border ${
                     activeStatus === tab.value
                       ? "border-indigo-500 text-indigo-300 bg-indigo-950/40 font-bold"
@@ -503,110 +517,207 @@ export default function DashboardPage() {
           </div>
 
           {/* Table Container */}
-          <div className="rounded border border-neutral-800 bg-neutral-900/60 overflow-x-auto">
-            <table className="w-full text-left font-mono text-xs">
-              <thead className="bg-neutral-950/80 text-[10px] text-neutral-500 uppercase border-b border-neutral-800">
-                <tr>
-                  <th className="p-3">Job ID</th>
-                  <th className="p-3">Type</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Priority</th>
-                  <th className="p-3">Attempts</th>
-                  <th className="p-3">Last Error</th>
-                  <th className="p-3">Created At</th>
-                  <th className="p-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-800/60">
-                  {loading ? (
-                   <tr>
-                     <td colSpan={8} className="p-6 text-center text-neutral-500">
-                       Loading queue data via Axios...
-                     </td>
-                   </tr>
-                 ) : jobs.length === 0 ? (
-                   <tr>
-                     <td colSpan={8} className="p-6 text-center text-neutral-500">
-                       No jobs match current status filter.
-                     </td>
-                   </tr>
-                 ) : (
-                  jobs.map((j) => {
-                    const statusColor =
-                      j.status === "completed"
-                        ? "bg-emerald-950 text-emerald-400 border-emerald-800"
-                        : j.status === "processing"
-                        ? "bg-blue-950 text-blue-400 border-blue-800 animate-pulse"
-                        : j.status === "failed"
-                        ? "bg-amber-950 text-amber-400 border-amber-800"
-                        : j.status === "dead_letter"
-                        ? "bg-rose-950 text-rose-400 border-rose-800"
-                        : "bg-neutral-900 text-neutral-400 border-neutral-800";
+          <div className="rounded border border-neutral-800 bg-neutral-900/60 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-mono text-xs">
+                <thead className="bg-neutral-950/80 text-[10px] text-neutral-500 uppercase border-b border-neutral-800">
+                  <tr>
+                    <th className="p-3">Job ID</th>
+                    <th className="p-3">Type</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Priority</th>
+                    <th className="p-3">Attempts</th>
+                    <th className="p-3">Last Error</th>
+                    <th className="p-3">Created At</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-800/60">
+                    {loading ? (
+                     <tr>
+                       <td colSpan={8} className="p-6 text-center text-neutral-500">
+                         Loading queue data via Axios...
+                       </td>
+                     </tr>
+                   ) : jobs.length === 0 ? (
+                     <tr>
+                       <td colSpan={8} className="p-6 text-center text-neutral-500">
+                         No jobs match current status filter.
+                       </td>
+                     </tr>
+                   ) : (
+                    jobs.map((j) => {
+                      const statusColor =
+                        j.status === "completed"
+                          ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                          : j.status === "processing"
+                          ? "bg-blue-950 text-blue-400 border-blue-800 animate-pulse"
+                          : j.status === "failed"
+                          ? "bg-amber-950 text-amber-400 border-amber-800"
+                          : j.status === "dead_letter"
+                          ? "bg-rose-950 text-rose-400 border-rose-800"
+                          : "bg-neutral-900 text-neutral-400 border-neutral-800";
 
-                    const isToastTarget = toast?.jobId === j.id;
+                      const isToastTarget = toast?.jobId === j.id;
 
-                    return (
-                      <tr
-                        key={j.id}
-                        className={`transition-colors ${
-                          isToastTarget ? "bg-indigo-950/50 border-l-2 border-l-indigo-500" : "hover:bg-neutral-900/80"
-                        }`}
+                      return (
+                        <tr
+                          key={j.id}
+                          className={`transition-colors ${
+                            isToastTarget ? "bg-indigo-950/50 border-l-2 border-l-indigo-500" : "hover:bg-neutral-900/80"
+                          }`}
+                        >
+                          <td className="p-3 font-bold text-neutral-200" title={j.id}>
+                            {j.id.slice(0, 8)}…
+                          </td>
+                          <td className="p-3 text-neutral-300 font-mono text-[11px]">{j.type}</td>
+                          <td className="p-3">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] border uppercase ${statusColor}`}>
+                              {j.status.replace("_", " ")}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${
+                              j.priority > 50
+                                ? "bg-rose-950 text-rose-300 border-rose-800"
+                                : j.priority > 0
+                                ? "bg-amber-950 text-amber-300 border-amber-800"
+                                : "bg-neutral-900 text-neutral-500 border-neutral-800"
+                            }`}>
+                              {j.priority ?? 0}
+                            </span>
+                          </td>
+                          <td className="p-3 text-neutral-400">
+                            {j.attempts} / {j.max_attempts}
+                          </td>
+                          <td className="p-3 text-neutral-400 max-w-[180px] truncate text-[11px]" title={j.last_error || ""}>
+                            {j.last_error || "—"}
+                          </td>
+                          <td className="p-3 text-neutral-400 text-[11px]">{fmtTime(j.created_at)}</td>
+                          <td className="p-3 text-right">
+                            {j.status === "dead_letter" ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleRetryDlq(j.id)}
+                                  className="px-2 py-0.5 text-[10px] rounded bg-purple-950 hover:bg-purple-900 border border-purple-800 text-purple-300 transition"
+                                  title="Re-queue to Pending"
+                                >
+                                  Retry
+                                </button>
+                                <button
+                                  onClick={() => handleDiscardDlq(j.id)}
+                                  className="px-2 py-0.5 text-[10px] rounded bg-rose-950 hover:bg-rose-900 border border-rose-800 text-rose-300 transition"
+                                  title="Delete from DLQ"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-neutral-600">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {(() => {
+              const totalPages = Math.max(1, Math.ceil(totalJobs / pageSize));
+              const startItem = totalJobs === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+              const endItem = Math.min(currentPage * pageSize, totalJobs);
+
+              return (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-neutral-950/80 border-t border-neutral-800 text-xs font-mono">
+                  <div className="flex items-center gap-3">
+                    <span className="text-neutral-400 text-[11px]">
+                      Showing <strong className="text-white font-mono">{startItem}</strong>–<strong className="text-white font-mono">{endItem}</strong> of <strong className="text-indigo-400 font-mono">{totalJobs}</strong> jobs
+                    </span>
+                    
+                    <div className="flex items-center gap-1.5 pl-3 border-l border-neutral-800">
+                      <span className="text-[10px] text-neutral-500 uppercase">Per page:</span>
+                      <select
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        aria-label="Jobs per page"
+                        className="px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 text-[11px] focus:outline-none focus:border-indigo-500 cursor-pointer"
                       >
-                        <td className="p-3 font-bold text-neutral-200" title={j.id}>
-                          {j.id.slice(0, 8)}…
-                        </td>
-                        <td className="p-3 text-neutral-300 font-mono text-[11px]">{j.type}</td>
-                        <td className="p-3">
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] border uppercase ${statusColor}`}>
-                            {j.status.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${
-                            j.priority > 50
-                              ? "bg-rose-950 text-rose-300 border-rose-800"
-                              : j.priority > 0
-                              ? "bg-amber-950 text-amber-300 border-amber-800"
-                              : "bg-neutral-900 text-neutral-500 border-neutral-800"
-                          }`}>
-                            {j.priority ?? 0}
-                          </span>
-                        </td>
-                        <td className="p-3 text-neutral-400">
-                          {j.attempts} / {j.max_attempts}
-                        </td>
-                        <td className="p-3 text-neutral-400 max-w-[180px] truncate text-[11px]" title={j.last_error || ""}>
-                          {j.last_error || "—"}
-                        </td>
-                        <td className="p-3 text-neutral-400 text-[11px]">{fmtTime(j.created_at)}</td>
-                        <td className="p-3 text-right">
-                          {j.status === "dead_letter" ? (
-                            <div className="flex items-center justify-end gap-1.5">
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Page Buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1 || loading}
+                      title="First Page"
+                      className="px-2 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition text-xs"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1 || loading}
+                      className="px-2.5 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition text-xs flex items-center gap-1"
+                    >
+                      ‹ Prev
+                    </button>
+
+                    {/* Page Number Chips */}
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .map((p, idx, arr) => {
+                          const prevP = arr[idx - 1];
+                          const showEllipsisBefore = prevP && p - prevP > 1;
+                          return (
+                            <React.Fragment key={p}>
+                              {showEllipsisBefore && <span className="px-1 text-neutral-600 text-xs">…</span>}
                               <button
-                                onClick={() => handleRetryDlq(j.id)}
-                                className="px-2 py-0.5 text-[10px] rounded bg-purple-950 hover:bg-purple-900 border border-purple-800 text-purple-300 transition"
-                                title="Re-queue to Pending"
+                                onClick={() => setCurrentPage(p)}
+                                className={`min-w-[28px] px-2 py-1 rounded text-xs transition font-mono ${
+                                  currentPage === p
+                                    ? "bg-indigo-600 text-white font-bold shadow-sm shadow-indigo-500/30 border border-indigo-500"
+                                    : "bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700"
+                                }`}
                               >
-                                Retry
+                                {p}
                               </button>
-                              <button
-                                onClick={() => handleDiscardDlq(j.id)}
-                                className="px-2 py-0.5 text-[10px] rounded bg-rose-950 hover:bg-rose-900 border border-rose-800 text-rose-300 transition"
-                                title="Delete from DLQ"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-neutral-600">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                            </React.Fragment>
+                          );
+                        })}
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages || loading}
+                      className="px-2.5 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition text-xs flex items-center gap-1"
+                    >
+                      Next ›
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage >= totalPages || loading}
+                      title="Last Page"
+                      className="px-2 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-white hover:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed transition text-xs"
+                    >
+                      »
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
