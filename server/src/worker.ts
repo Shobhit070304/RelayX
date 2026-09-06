@@ -12,8 +12,8 @@ import { pool } from './config/db';
 // How many jobs can run in parallel inside this single worker process.
 // Increase this number to get more throughput on I/O-bound workloads.
 // Do NOT set higher than your DB pool size (currently 20).
-const CONCURRENCY_LIMIT = parseInt(process.env.WORKER_CONCURRENCY ?? '5');
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '2000');
+const CONCURRENCY_LIMIT = parseInt(process.env.WORKER_CONCURRENCY ?? '5', 10);
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '2000', 10);
 const REAPER_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -35,10 +35,6 @@ async function processJob(): Promise<void> {
     let job;
     try {
         job = await claimNextPendingJob();
-    } catch (err) {
-        // DB errors during claim are handled by the outer scheduler catch.
-        // Re-throw so the scheduler can log and recover.
-        throw err;
     } finally {
         // Always release the reserved slot regardless of success or failure.
         pendingClaimsCount--;

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 
 // --- Types for Interactive Simulator ---
-type JobStatus = "pending" | "processing" | "completed" | "failed" | "dead_letter";
+type JobStatus = "pending" | "processing" | "completed" | "dead_letter";
 
 interface SimJob {
   id: string;
@@ -25,12 +25,12 @@ export default function LandingPage() {
     { id: "job_9x81a", type: "send_email", payload: '{"to":"usr_42@test.com"}', status: "completed", attempts: 1, maxAttempts: 3, time: "14:20:01" },
     { id: "job_7f42b", type: "resize_image", payload: '{"url":"img_88.png"}', status: "processing", attempts: 1, maxAttempts: 5, time: "14:20:12" },
     { id: "job_3k19c", type: "send_email", payload: '{"to":"alice@test.com"}', status: "pending", attempts: 0, maxAttempts: 3, time: "14:20:25" },
-    { id: "job_1m04d", type: "resize_image", payload: '{"url":"avatar.jpg","simulateFailure":true}', status: "failed", attempts: 2, maxAttempts: 3, time: "14:20:30" },
+    { id: "job_1m04d", type: "resize_image", payload: '{"url":"avatar.jpg","simulateFailure":true}', status: "pending", attempts: 2, maxAttempts: 3, time: "14:20:30" },
     { id: "job_8p33e", type: "send_email", payload: '{"to":"bad@domain.com","simulateFailure":true}', status: "dead_letter", attempts: 3, maxAttempts: 3, time: "14:19:40" },
   ]);
 
   const [simLogs, setSimLogs] = useState<string[]>([
-    "[14:20:30] [worker-02] ERROR job_1m04d: Simulated resize failure (attempt 2/3)",
+    "[14:20:30] [worker-02] WARN job_1m04d: Simulated resize failure (attempt 2/3) -> retry scheduled (PENDING)",
     "[14:20:25] [api-server] POST /api/jobs -> job_3k19c: send_email (state: PENDING)",
     "[14:20:12] [worker-01] CLAIM job_7f42b: resize_image -> locked via FOR UPDATE SKIP LOCKED",
     "[14:20:01] [worker-03] ACK job_9x81a: send_email -> COMPLETED in 142ms",
@@ -84,20 +84,20 @@ export default function LandingPage() {
 
     const newAttempts = target.attempts + 1;
     const isDlq = newAttempts >= target.maxAttempts;
-    const newStatus: JobStatus = isDlq ? "dead_letter" : "failed";
+    const newStatus: JobStatus = isDlq ? "dead_letter" : "pending";
 
     setJobs((prev) =>
       prev.map((j) => (j.id === target.id ? { ...j, status: newStatus, attempts: newAttempts } : j))
     );
 
     setSimLogs((prev) => [
-      `[${now}] [worker-02] ${isDlq ? "FATAL" : "WARN"} ${target.id}: Handler exception (attempt ${newAttempts}/${target.maxAttempts}) -> state: ${newStatus.toUpperCase()}`,
+      `[${now}] [worker-02] ${isDlq ? "FATAL" : "WARN"} ${target.id}: Handler exception (attempt ${newAttempts}/${target.maxAttempts}) -> ${isDlq ? "moved to DEAD_LETTER" : "retry scheduled (PENDING)"}`,
       ...prev.slice(0, 9),
     ]);
   };
 
   const handleRequeueDlq = () => {
-    const dlqJob = jobs.find((j) => j.status === "dead_letter" || j.status === "failed");
+    const dlqJob = jobs.find((j) => j.status === "dead_letter");
     if (!dlqJob) return;
 
     const now = new Date().toLocaleTimeString("en-US", { hour12: false });
@@ -304,8 +304,6 @@ export default function LandingPage() {
                             ? "bg-emerald-950 text-emerald-400 border-emerald-800"
                             : job.status === "processing"
                             ? "bg-blue-950 text-blue-400 border-blue-800 animate-pulse"
-                            : job.status === "failed"
-                            ? "bg-amber-950 text-amber-400 border-amber-800"
                             : job.status === "dead_letter"
                             ? "bg-rose-950 text-rose-400 border-rose-800"
                             : "bg-neutral-900 text-neutral-400 border-neutral-800";
@@ -596,7 +594,7 @@ export default function LandingPage() {
                   <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800">
                     <span className="text-white font-bold text-sm">status</span>
                     <span className="text-neutral-400 block text-xs font-sans mt-1">
-                      State enum: `pending`, `processing`, `completed`, `failed`, `dead_letter`.
+                      State enum: `pending`, `processing`, `completed`, `dead_letter`.
                     </span>
                   </div>
 
