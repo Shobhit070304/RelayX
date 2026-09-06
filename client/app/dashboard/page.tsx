@@ -552,8 +552,6 @@ export default function DashboardPage() {
                           ? "bg-emerald-950 text-emerald-400 border-emerald-800"
                           : j.status === "processing"
                           ? "bg-blue-950 text-blue-400 border-blue-800 animate-pulse"
-                          : j.status === "failed"
-                          ? "bg-amber-950 text-amber-400 border-amber-800"
                           : j.status === "dead_letter"
                           ? "bg-rose-950 text-rose-400 border-rose-800"
                           : "bg-neutral-900 text-neutral-400 border-neutral-800";
@@ -804,7 +802,7 @@ export default function DashboardPage() {
               <input
                 type="number"
                 min="1"
-                max="10"
+                max="25"
                 value={maxAttempts}
                 onChange={(e) => setMaxAttempts(Number(e.target.value))}
                 className="w-full px-3 py-1.5 rounded bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500"
@@ -878,10 +876,9 @@ export default function DashboardPage() {
                 <span className="text-[9px] text-neutral-500 uppercase font-mono">(Optional)</span>
               </div>
               <input
-                type="text"
+                type="datetime-local"
                 value={runAt}
                 onChange={(e) => setRunAt(e.target.value)}
-                placeholder="e.g. 2026-08-04T16:00:00.000Z"
                 className="w-full px-3 py-1.5 rounded bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500"
               />
             </div>

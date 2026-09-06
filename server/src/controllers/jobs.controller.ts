@@ -45,10 +45,10 @@ export async function createJobHandler(req: Request, res: Response) {
             }
         }
 
-        // 4. priority must be an integer
+        // 4. priority must be a non-negative integer
         if (priority !== undefined) {
-            if (typeof priority !== 'number' || !Number.isInteger(priority)) {
-                return res.status(400).json({ error: 'priority must be an integer' });
+            if (typeof priority !== 'number' || !Number.isInteger(priority) || priority < 0) {
+                return res.status(400).json({ error: 'priority must be a non-negative integer (>= 0)' });
             }
         }
 

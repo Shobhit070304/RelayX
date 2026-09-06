@@ -9,7 +9,7 @@ const app = express();
 
 app.use(cors({ origin: process.env.CORS_ORIGIN }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 app.use('/api', jobsRouter);
 app.use('/api', deadLetterRouter);

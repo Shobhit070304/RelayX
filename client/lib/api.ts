@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
 
 // --- Data Types matching RelayX Backend Models ---
-export type JobStatus = "pending" | "processing" | "completed" | "failed" | "dead_letter";
+export type JobStatus = "pending" | "processing" | "completed" | "dead_letter";
 
 export interface Job {
   id: string;

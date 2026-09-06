@@ -2,6 +2,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../config/db';
 import { Job, CreateJobInput } from '../models/job.types';
 
+// Type guard for PostgreSQL driver errors that carry a vendor error code.
+interface PgError extends Error { code: string; }
+function isPgError(err: unknown): err is PgError {
+    return typeof err === 'object' && err !== null && 'code' in err;
+}
+
 export async function createJob(input: CreateJobInput): Promise<{ job: Job; isDuplicate: boolean }> {
     const id = uuidv4();
     const { type, payload = {}, max_attempts = 3, delay_seconds, run_at, idempotency_key, priority = 0 } = input;
@@ -22,10 +28,10 @@ export async function createJob(input: CreateJobInput): Promise<{ job: Job; isDu
             [id, type, payload, max_attempts, availableAt, idempotency_key ?? null, priority]
         );
         return { job: result.rows[0], isDuplicate: false };
-    } catch (err: any) {
+    } catch (err) {
         // PostgreSQL unique constraint violation — idempotency_key already exists.
         // Return the original job instead of creating a duplicate.
-        if (err.code === '23505' && idempotency_key) {
+        if (isPgError(err) && err.code === '23505' && idempotency_key) {
             const existing = await pool.query<Job>(
                 `SELECT * FROM jobs WHERE idempotency_key = $1`,
                 [idempotency_key]
