@@ -7,7 +7,7 @@ import cors from 'cors';
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN }));
+app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.json({ limit: '100kb' }));
 
