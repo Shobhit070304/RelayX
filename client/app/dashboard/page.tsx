@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { relayApi, apiClient, StatsData, Job } from "@/lib/api";
 
@@ -71,7 +71,7 @@ export default function DashboardPage() {
   };
 
   // Fetch Dashboard Stats & Jobs using Axios API Service
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const [statsData, jobsData] = await Promise.all([
         relayApi.getStats(),
@@ -91,13 +91,13 @@ export default function DashboardPage() {
       setMetaText(`⚠ Axios Error: ${err.message || "Backend server offline (http://localhost:3000)"}`);
       setLoading(false);
     }
-  };
+  }, [activeStatus, currentPage, pageSize]);
 
   useEffect(() => {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 5000);
     return () => clearInterval(interval);
-  }, [activeStatus, currentPage, pageSize]);
+  }, [fetchDashboardData]);
 
   // Handle Job Type change
   const handleJobTypeChange = (type: string) => {
@@ -186,7 +186,7 @@ export default function DashboardPage() {
       });
 
       const durationMs = Date.now() - startTime;
-      const createdJobId = response.data?.data?.id || response.data?.job?.id || response.data?.id;
+      const createdJobId = response.data?.id;
 
       setFullResponse({
         status: response.status,

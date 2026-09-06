@@ -11,7 +11,7 @@ import { pool } from './config/db';
 // ── Concurrency Config ───────────────────────────────────────────────────────
 // How many jobs can run in parallel inside this single worker process.
 // Increase this number to get more throughput on I/O-bound workloads.
-// Do NOT set higher than your DB pool size (currently 10).
+// Do NOT set higher than your DB pool size (currently 20).
 const CONCURRENCY_LIMIT = parseInt(process.env.WORKER_CONCURRENCY ?? '5');
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '2000');
 const REAPER_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes

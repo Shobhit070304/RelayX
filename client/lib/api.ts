@@ -68,15 +68,8 @@ export interface PaginatedResponse<T> {
 }
 
 // Determine default API Base URL dynamically
-const getBaseUrl = (): string => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (typeof window !== "undefined" && window.location.port === "3001") {
-    return "http://localhost:5000";
-  }
-  return "http://localhost:5000";
-};
+const getBaseUrl = (): string =>
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 // Create Axios Client Instance
 export const apiClient: AxiosInstance = axios.create({
