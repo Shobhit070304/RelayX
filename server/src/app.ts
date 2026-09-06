@@ -7,7 +7,7 @@ import cors from 'cors';
 
 const app = express();
 
-app.use(cors({origin:"*"}))
+app.use(cors({ origin: process.env.CORS_ORIGIN }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.json());
 
@@ -15,8 +15,6 @@ app.use('/api', jobsRouter);
 app.use('/api', deadLetterRouter);
 app.use('/api', statsRouter);
 
-
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
-
 
 export default app;

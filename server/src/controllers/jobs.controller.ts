@@ -80,11 +80,19 @@ export async function createJobHandler(req: Request, res: Response) {
     }
 }
 
+const VALID_JOB_STATUSES = ['pending', 'processing', 'completed', 'dead_letter'] as const;
+
 export async function listJobsHandler(req: Request, res: Response) {
     try {
         const limit = parseInt(req.query.limit as string, 10) || 10;
         const offset = parseInt(req.query.offset as string, 10) || 0;
         const status = typeof req.query.status === 'string' && req.query.status.trim() !== '' ? req.query.status.trim() : undefined;
+
+        if (status && !VALID_JOB_STATUSES.includes(status as typeof VALID_JOB_STATUSES[number])) {
+            return res.status(400).json({
+                error: `Invalid status "${status}". Must be one of: ${VALID_JOB_STATUSES.join(', ')}`,
+            });
+        }
 
         if (limit < 1 || limit > 100) {
             return res.status(400).json({ error: '"limit" must be between 1 and 100' });
