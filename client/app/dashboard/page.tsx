@@ -301,7 +301,7 @@ export default function DashboardPage() {
       
       {/* ── FLOATING TOAST NOTIFICATION ──────────────────────────────────────── */}
       {toast && (
-        <div className="fixed top-5 right-5 z-50 max-w-sm w-full bg-neutral-900 border border-neutral-700 shadow-2xl rounded-lg p-4 font-mono text-xs animate-in slide-in-from-top-3 duration-200 space-y-2">
+        <div className="fixed top-[68px] right-5 z-[100] max-w-sm w-full bg-neutral-900 border border-neutral-700 shadow-2xl rounded-lg p-4 font-mono text-xs animate-in slide-in-from-top-3 duration-200 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="text-base">
