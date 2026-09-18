@@ -13,7 +13,7 @@ import { pool } from './config/db';
 // Increase this number to get more throughput on I/O-bound workloads.
 // Do NOT set higher than your DB pool size (currently 20).
 const CONCURRENCY_LIMIT = parseInt(process.env.WORKER_CONCURRENCY ?? '5', 10);
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '2000', 10);
+const SAFETY_POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '30000', 10);
 const REAPER_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ let pendingClaimsCount = 0;
 let isShuttingDown = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let reaperTimer: ReturnType<typeof setTimeout> | null = null;
+let listenerClient: import('pg').PoolClient | null = null;
 
 // ── Core: Claim and launch a single job ─────────────────────────────────────
 async function processJob(): Promise<void> {
@@ -100,7 +101,7 @@ async function processJob(): Promise<void> {
 // ── Polling Scheduler ────────────────────────────────────────────────────────
 // Uses setTimeout (not setInterval) so poll calls never pile up on each other.
 // Each poll schedules the next one only after it has run.
-function scheduleNextPoll(delayMs: number = POLL_INTERVAL_MS): void {
+function scheduleNextPoll(delayMs: number = SAFETY_POLL_INTERVAL_MS): void {
     if (isShuttingDown) return;
 
     // If a regular-interval poll is already scheduled and this is another
@@ -120,7 +121,7 @@ function scheduleNextPoll(delayMs: number = POLL_INTERVAL_MS): void {
             console.error('[worker] Unhandled error in poll cycle — will retry on next interval:', err);
         }
         // Schedule the next regular idle poll after this one finishes.
-        scheduleNextPoll(POLL_INTERVAL_MS);
+        scheduleNextPoll(SAFETY_POLL_INTERVAL_MS);
     }, delayMs);
 }
 async function runReaper(): Promise<void> {
@@ -165,20 +166,58 @@ async function shutdown(signal: string): Promise<void> {
         await new Promise((r) => setTimeout(r, 200));
     }
 
+    if (listenerClient !== null) {
+        listenerClient.removeAllListeners();
+        listenerClient.release();
+        listenerClient = null;
+    }
+
     clearTimeout(forceShutdownTimer);
     await pool.end();
     console.log('[worker] All jobs drained. Shut down cleanly.');
     process.exit(0);
 }
 
+// ── LISTEN / NOTIFY: Reactive wakeup ────────────────────────────────────────
+// We check-out one dedicated client from the pool and keep it alive solely
+// for receiving NOTIFY signals. This client must NOT be released back to the
+// pool (that would drop the LISTEN registration).
+async function startListener(): Promise<void> {
+    try {
+        listenerClient = await pool.connect();
+        await listenerClient.query('LISTEN NEW_JOBS');
+        console.log('[worker] LISTEN registered on channel "NEW_JOBS"');
+
+        listenerClient.on('notification', () => {
+            scheduleNextPoll(0);
+        })
+
+        listenerClient.on('error', (err) => {
+            console.error('[worker] Listener client error — will reconnect:', err.message);
+            listenerClient = null;
+
+            if (!isShuttingDown) {
+                setTimeout(startListener, 5000);
+            }
+        })
+    } catch (error) {
+        console.error('[worker] Failed to start listener — will retry in 5s:', error);
+        if (!isShuttingDown) {
+            setTimeout(startListener, 5000);
+        }
+    }
+}
+
+
 // ── Bootstrap ────────────────────────────────────────────────────────────────
-console.log(`[worker] Started — concurrency: ${CONCURRENCY_LIMIT}, poll interval: ${POLL_INTERVAL_MS}ms`);
+console.log(`[worker] Started — concurrency: ${CONCURRENCY_LIMIT}, poll interval: ${SAFETY_POLL_INTERVAL_MS}ms`);
 
 // Run the reaper immediately on startup to recover any orphaned jobs from a
 // previous worker crash, then schedule it to run on a recurring interval.
 runReaper();
 
 // Kick off the very first poll immediately on startup.
+startListener();
 scheduleNextPoll(0);
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));

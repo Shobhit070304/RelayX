@@ -26,9 +26,9 @@ async function runMigration() {
     }
 
     const requiresSsl =
-        process.env.NODE_ENV === 'production' ||
         process.env.DATABASE_URL.includes('neon.tech') ||
-        process.env.DATABASE_URL.includes('sslmode=require');
+        process.env.DATABASE_URL.includes('sslmode=require') ||
+        process.env.DATABASE_SSL === 'true';
 
     const client = new Client({
         connectionString: process.env.DATABASE_URL,

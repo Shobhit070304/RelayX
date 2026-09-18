@@ -27,7 +27,12 @@ export async function createJob(input: CreateJobInput): Promise<{ job: Job; isDu
             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
             [id, type, payload, max_attempts, availableAt, idempotency_key ?? null, priority]
         );
-        return { job: result.rows[0], isDuplicate: false };
+        const job = result.rows[0];
+
+        // Fire a push notification to all listening workers.
+        // We fire-and-forget — if it fails, the safety poll will still catch the job.
+        pool.query(`NOTIFY NEW_JOBS`).catch(() => { });
+        return { job, isDuplicate: false };
     } catch (err) {
         // PostgreSQL unique constraint violation — idempotency_key already exists.
         // Return the original job instead of creating a duplicate.
@@ -252,7 +257,7 @@ export async function cleanOrphanedJobs(): Promise<number> {
     if (count > 0) {
         const deadLettered = result.rows.filter(r => r.status === 'dead_letter').length;
         const resetPending = count - deadLettered;
-        
+
         if (resetPending > 0) {
             console.log(`[reaper] Reset ${resetPending} orphaned processing job(s) back to pending.`);
         }
