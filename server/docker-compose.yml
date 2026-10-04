@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -18,31 +16,20 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   api:
     build:
       context: .
       target: production
+    command: ["sh", "-c", "node migrations/run.js && exec node dist/server.js"]
     ports:
       - "5000:5000"
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/distributed_job_platform
-      REDIS_URL: redis://redis:6379
       PORT: 5000
+      CORS_ORIGIN: http://localhost:3000
       NODE_ENV: production
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -53,7 +40,6 @@ services:
     command: ["node", "dist/worker.js"]
     environment:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/distributed_job_platform
-      REDIS_URL: redis://redis:6379
       NODE_ENV: production
       # How many jobs run in parallel inside this single worker container.
       # Scale out by increasing replicas OR this number (or both).
@@ -61,8 +47,6 @@ services:
       POLL_INTERVAL_MS: 2000
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     restart: unless-stopped
 

@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { validateEnv } from './config/env';
+import { env, validateEnv } from './config/env';
 validateEnv();
 
 import { claimNextPendingJob, markJobCompleted, handleJobFailure, markJobFailedTerminal, cleanOrphanedJobs } from './services/jobs.service';
@@ -12,8 +12,8 @@ import { pool } from './config/db';
 // How many jobs can run in parallel inside this single worker process.
 // Increase this number to get more throughput on I/O-bound workloads.
 // Do NOT set higher than your DB pool size (currently 20).
-const CONCURRENCY_LIMIT = parseInt(process.env.WORKER_CONCURRENCY ?? '5', 10);
-const SAFETY_POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '30000', 10);
+const CONCURRENCY_LIMIT = env.WORKER_CONCURRENCY;
+const SAFETY_POLL_INTERVAL_MS = env.POLL_INTERVAL_MS;
 const REAPER_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -190,18 +190,29 @@ async function startListener(): Promise<void> {
 
         listenerClient.on('notification', () => {
             scheduleNextPoll(0);
-        })
+        });
 
         listenerClient.on('error', (err) => {
             console.error('[worker] Listener client error — will reconnect:', err.message);
+            if (listenerClient) {
+                try {
+                    listenerClient.release(true);
+                } catch (_) {}
+            }
             listenerClient = null;
 
             if (!isShuttingDown) {
                 setTimeout(startListener, 5000);
             }
-        })
+        });
     } catch (error) {
         console.error('[worker] Failed to start listener — will retry in 5s:', error);
+        if (listenerClient) {
+            try {
+                listenerClient.release(true);
+            } catch (_) {}
+            listenerClient = null;
+        }
         if (!isShuttingDown) {
             setTimeout(startListener, 5000);
         }

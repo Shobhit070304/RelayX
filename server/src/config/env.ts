@@ -1,14 +1,18 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-export function validateEnv(): void {
-    const required = ['DATABASE_URL'] as const;
-    const missing = required.filter((key) => !process.env[key]);
+export const env = {
+    NODE_ENV: process.env.NODE_ENV || 'development',
+    PORT: Number(process.env.PORT) || 5000,
+    DATABASE_URL: process.env.DATABASE_URL || '',
+    DATABASE_SSL: process.env.DATABASE_SSL === 'true',
+    CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    WORKER_CONCURRENCY: Number(process.env.WORKER_CONCURRENCY) || 5,
+    POLL_INTERVAL_MS: Number(process.env.POLL_INTERVAL_MS) || 2000,
+};
 
-    if (missing.length > 0) {
-        console.error(
-            `[fatal] Missing required environment variables: ${missing.join(', ')}`
-        );
-        process.exit(1);
+export function validateEnv() {
+    if (!env.DATABASE_URL) {
+        throw new Error('DATABASE_URL is required');
     }
-}
+}

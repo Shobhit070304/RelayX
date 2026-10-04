@@ -104,7 +104,7 @@ export async function handleJobFailure(job: Job, error: Error): Promise<void> {
     await pool.query(
         `UPDATE jobs
      SET status = 'pending', attempts = $1, last_error = $2,
-         available_at = now() + ($3 || ' milliseconds')::interval,
+         available_at = now() + ($3 * interval '1 millisecond'),
          updated_at = now()
      WHERE id = $4`,
         [newAttempts, error.message, delayMs, job.id]
@@ -162,7 +162,11 @@ export async function retryDeadLetterJob(id: string): Promise<Job | null> {
      RETURNING *`,
         [id]
     );
-    return result.rows[0] ?? null;
+    const job = result.rows[0] ?? null;
+    if (job) {
+        pool.query(`NOTIFY NEW_JOBS`).catch(() => { });
+    }
+    return job;
 }
 
 export async function discardDeadLetterJob(id: string): Promise<boolean> {
@@ -248,7 +252,7 @@ export async function cleanOrphanedJobs(): Promise<number> {
            started_at = NULL,
            updated_at = now()
          WHERE status = 'processing'
-           AND updated_at < now() - ($1 || ' minutes')::interval
+           AND updated_at < now() - ($1 * interval '1 minute')
          RETURNING id, status`,
         [STALE_JOB_TIMEOUT_MINUTES]
     );
@@ -260,6 +264,7 @@ export async function cleanOrphanedJobs(): Promise<number> {
 
         if (resetPending > 0) {
             console.log(`[reaper] Reset ${resetPending} orphaned processing job(s) back to pending.`);
+            pool.query(`NOTIFY NEW_JOBS`).catch(() => { });
         }
         if (deadLettered > 0) {
             console.log(`[reaper] Marked ${deadLettered} orphaned job(s) as dead_letter (exhausted attempts).`);

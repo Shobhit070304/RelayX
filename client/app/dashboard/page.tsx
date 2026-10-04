@@ -8,7 +8,6 @@ import { relayApi, apiClient, StatsData, Job } from "@/lib/api";
 const DEFAULT_PAYLOADS: Record<string, string> = {
   send_email: '{\n  "to": "user@example.com"\n}',
   resize_image: '{\n  "url": "https://example.com/photo.jpg"\n}',
-  custom: '{\n  "key": "value"\n}',
 };
 
 interface ResponseDetails {
@@ -42,7 +41,6 @@ export default function DashboardPage() {
 
   // --- Playground Form State ---
   const [selectedJobType, setSelectedJobType] = useState<string>("send_email");
-  const [customJobType, setCustomJobType] = useState<string>("");
   const [payloadJson, setPayloadJson] = useState<string>(DEFAULT_PAYLOADS["send_email"]);
   const [simulateFailure, setSimulateFailure] = useState<boolean>(false);
   const [maxAttempts, setMaxAttempts] = useState<number>(3);
@@ -88,7 +86,7 @@ export default function DashboardPage() {
       setMetaText(`Last updated: ${new Date().toLocaleTimeString()} · Auto-refreshes every 5s`);
       setLoading(false);
     } catch (err: any) {
-      setMetaText(`⚠ Axios Error: ${err.message || "Backend server offline (http://localhost:3000)"}`);
+      setMetaText(`⚠ Axios Error: ${err.message || "Backend server offline (http://localhost:5000)"}`);
       setLoading(false);
     }
   }, [activeStatus, currentPage, pageSize]);
@@ -114,7 +112,7 @@ export default function DashboardPage() {
     setFullResponse(null);
     const startTime = Date.now();
 
-    const finalType = selectedJobType === "custom" ? customJobType.trim() : selectedJobType;
+    const finalType = selectedJobType;
 
     // Validation 1: Job Type Check
     if (!finalType) {
@@ -133,7 +131,7 @@ export default function DashboardPage() {
 
     // Validation 2: Either delay_seconds OR run_at check
     const delayNum = delaySeconds.trim() !== "" ? Number(delaySeconds) : undefined;
-    const runAtStr = runAt.trim() !== "" ? runAt.trim() : undefined;
+    const runAtStr = runAt.trim() !== "" ? new Date(runAt).toISOString() : undefined;
 
     if (delayNum !== undefined && runAtStr !== undefined) {
       const errMsg = "Conflict: Provide EITHER Delay (Seconds) OR Scheduled Run At (run_at), not both.";
@@ -187,10 +185,11 @@ export default function DashboardPage() {
 
       const durationMs = Date.now() - startTime;
       const createdJobId = response.data?.id;
+      const isReplay = response.headers["idempotent-replay"] === "true" || response.status === 200;
 
       setFullResponse({
         status: response.status,
-        statusText: response.statusText || "Created",
+        statusText: response.statusText || (isReplay ? "OK (Replay)" : "Created"),
         durationMs,
         data: response.data,
         isError: false,
@@ -198,8 +197,10 @@ export default function DashboardPage() {
 
       showToast(
         "success",
-        "🚀 Job Fired Successfully!",
-        `Job type "${finalType}" dispatched to queue with status PENDING.`,
+        isReplay ? "♻️ Idempotent Replay" : "🚀 Job Fired Successfully!",
+        isReplay
+          ? `Idempotent request detected. Returned existing job ${createdJobId?.slice(0, 8)}… with status ${response.data?.status?.toUpperCase()}.`
+          : `Job type "${finalType}" dispatched to queue with status PENDING.`,
         createdJobId
       );
 
@@ -746,7 +747,7 @@ export default function DashboardPage() {
           <form onSubmit={handleEnqueueJob} className="grid grid-cols-1 md:grid-cols-12 gap-4 text-xs font-mono">
             
             {/* Job Type Selector */}
-            <div className="md:col-span-4 space-y-1">
+            <div className="md:col-span-6 space-y-1">
               <label className="text-[10px] text-neutral-300 block font-bold">
                 Job Type <span className="text-rose-400">*</span>
               </label>
@@ -757,29 +758,11 @@ export default function DashboardPage() {
               >
                 <option value="send_email">send_email (Handler registered)</option>
                 <option value="resize_image">resize_image (Handler registered)</option>
-                <option value="custom">Custom Job Type...</option>
               </select>
             </div>
 
-            {/* Custom Job Type Input if selected */}
-            {selectedJobType === "custom" && (
-              <div className="md:col-span-4 space-y-1">
-                <label className="text-[10px] text-neutral-300 block font-bold">
-                  Custom Type Name <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={customJobType}
-                  onChange={(e) => setCustomJobType(e.target.value)}
-                  placeholder="e.g. webhook.dispatch"
-                  className="w-full px-3 py-2 rounded bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500"
-                  required
-                />
-              </div>
-            )}
-
             {/* Simulate Failure Single Toggle */}
-            <div className="md:col-span-4 flex items-center gap-2 pt-5">
+            <div className="md:col-span-6 flex items-center gap-2 pt-5">
               <label className="flex items-center gap-2 cursor-pointer bg-neutral-950 px-3 py-2 rounded border border-neutral-800 hover:border-amber-700/80 transition w-full">
                 <input
                   type="checkbox"
@@ -804,7 +787,7 @@ export default function DashboardPage() {
                 min="1"
                 max="25"
                 value={maxAttempts}
-                onChange={(e) => setMaxAttempts(Number(e.target.value))}
+                onChange={(e) => setMaxAttempts(e.target.value === "" ? 1 : Math.max(1, Math.min(25, Number(e.target.value))))}
                 className="w-full px-3 py-1.5 rounded bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
@@ -822,7 +805,7 @@ export default function DashboardPage() {
                 type="number"
                 min="0"
                 value={priority}
-                onChange={(e) => setPriority(Number(e.target.value))}
+                onChange={(e) => setPriority(e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)))}
                 placeholder="0 = normal, 100 = urgent"
                 className="w-full px-3 py-1.5 rounded bg-neutral-950 border border-neutral-800 text-white focus:outline-none focus:border-indigo-500"
               />

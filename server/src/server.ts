@@ -1,13 +1,13 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { validateEnv } from './config/env';
+import { env, validateEnv } from './config/env';
 validateEnv();
 
 import app from './app';
 import { pool } from './config/db';
 
-const PORT = process.env.PORT || 5000;
+const PORT = env.PORT;
 
 const server = app.listen(PORT, () => {
     console.log(`[api] Server running on http://localhost:${PORT}`);
