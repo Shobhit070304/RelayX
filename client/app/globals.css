@@ -6,36 +6,70 @@
   }
 }
 
-/* Slight tactile jitter keyframes */
-@keyframes subtle-jitter {
+/* ── Ultra-Premium Tactile Film Grain Jitter ──────────────────────────────── */
+@keyframes film-jitter {
   0% { transform: translate(0, 0); }
-  25% { transform: translate(-0.5px, 0.5px); }
-  50% { transform: translate(0.5px, -0.5px); }
-  75% { transform: translate(-0.3px, -0.4px); }
+  20% { transform: translate(-3px, 2px); }
+  40% { transform: translate(2px, -3px); }
+  60% { transform: translate(-2px, -1px); }
+  80% { transform: translate(3px, 1px); }
   100% { transform: translate(0, 0); }
 }
 
 .animate-subtle-jitter {
-  animation: subtle-jitter 0.35s steps(2, end) infinite;
-}
-
-/* Subtle ambient radial spotlight glows & gradients */
-.bg-ambient-glow {
-  background-image: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.15), rgba(255, 255, 255, 0)),
-    radial-gradient(ellipse 60% 40% at 50% 30%, rgba(16, 185, 129, 0.08), transparent 70%),
-    radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.08), transparent 50%);
-}
-
-.bg-grid-subtle {
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 28px 28px;
+  animation: film-jitter 0.18s steps(4) infinite;
 }
 
 .grain-jitter-overlay {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+  position: fixed;
+  inset: -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* ── Rich SaaS Ambient Gradient Glow with Breathing Drift ────────────────── */
+@keyframes ambient-glow-pulse {
+  0% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-8px);
+  }
+  100% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+}
+
+.animate-ambient-glow {
+  animation: ambient-glow-pulse 9s ease-in-out infinite alternate;
+}
+
+.bg-ambient-glow {
+  background-image: 
+    /* Top Amber / Honey Solar Flare */
+    radial-gradient(ellipse 80% 55% at 50% -12%, rgba(245, 158, 11, 0.25), transparent 70%),
+    /* Right Electric Indigo / Violet Bloom */
+    radial-gradient(ellipse 65% 50% at 92% 18%, rgba(99, 102, 241, 0.22), transparent 65%),
+    /* Left Velvet Crimson / Magenta Accent */
+    radial-gradient(circle 600px at 8% 40%, rgba(225, 29, 72, 0.14), transparent 65%),
+    /* Bottom Deep Emerald / Cyan Horizon */
+    radial-gradient(ellipse 60% 45% at 75% 85%, rgba(16, 185, 129, 0.10), transparent 60%);
+}
+
+/* ── Radial-Masked Micro Grid ─────────────────────────────────────────────── */
+.bg-grid-subtle {
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 25%, black 45%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 25%, black 45%, transparent 85%);
 }
 
 /* Custom compact scrollbar */

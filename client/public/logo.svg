@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" fill="none">
+  <defs>
+    <!-- Warm Amber / Gold Gradient -->
+    <linearGradient id="amberGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <!-- Deep Electric Violet / Indigo Gradient -->
+    <linearGradient id="violetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7" />
+      <stop offset="50%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+    <!-- Subtle Ambient Glow -->
+    <filter id="glowFilter" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#F59E0B" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <g filter="url(#glowFilter)">
+    <!-- Base Violet Strand (Back layer of the infinity loop) -->
+    <path
+      d="M 60 35 C 75 52, 92 52, 98 42 C 105 32, 102 18, 88 18 C 74 18, 64 28, 60 35 C 56 42, 46 52, 32 52 C 18 52, 15 38, 22 28 C 28 18, 45 18, 60 35 Z"
+      stroke="url(#violetGradient)"
+      stroke-width="11"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- Overlapping Amber Strand (Front layer of the infinity loop creating the interlocked weave) -->
+    <path
+      d="M 28 22 C 40 18, 54 26, 60 35 C 66 44, 80 52, 92 48 C 104 44, 104 26, 92 20 C 80 14, 66 25, 60 35 C 54 45, 40 54, 28 50 C 16 46, 16 26, 28 22 Z"
+      stroke="url(#amberGradient)"
+      stroke-width="10.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- Inner Core Accent Node -->
+    <circle cx="60" cy="35" r="3" fill="#FEF3C7" opacity="0.9" />
+  </g>
+</svg>

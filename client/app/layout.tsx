@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "RelayX — High-Performance Distributed Job Engine",
   description: "Postgres-backed distributed job processing engine with retries, dead-letter queues, and idempotency guarantees.",
+  icons: {
+    icon: "/logo.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
